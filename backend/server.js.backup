@@ -1,0 +1,185 @@
+﻿const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files
+app.use('/uploads', express.static('backend/uploads'));
+
+// File upload configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'backend/uploads/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /pdf|jpeg|jpg|png|doc|docx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only PDF, images, and Word documents are allowed'));
+    }
+  }
+});
+
+// Routes
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'MSME Invoice Financing Backend API',
+    version: '1.0.0',
+    endpoints: {
+      upload: 'POST /api/upload',
+      invoices: 'GET /api/invoices',
+      risk: 'POST /api/risk-score',
+      ipfs: 'POST /api/ipfs-upload'
+    }
+  });
+});
+
+// Upload invoice document
+app.post('/api/upload', upload.single('invoice'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const fileUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      message: 'File uploaded successfully',
+      file: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        url: fileUrl,
+        path: req.file.path
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Simulate risk scoring API
+app.post('/api/risk-score', (req, res) => {
+  try {
+    const { msmeDetails, buyerDetails, invoiceAmount, dueDate } = req.body;
+    
+    // Mock risk scoring algorithm
+    const riskFactors = {
+      msmeAge: Math.floor(Math.random() * 100),
+      buyerCredit: Math.floor(Math.random() * 100),
+      invoiceSize: invoiceAmount > 10000 ? 30 : 70,
+      paymentHistory: Math.floor(Math.random() * 100),
+      industryRisk: Math.floor(Math.random() * 100)
+    };
+    
+    const totalScore = Object.values(riskFactors).reduce((a, b) => a + b, 0) / 5;
+    
+    // Categorize risk
+    let riskLevel = 'HIGH';
+    let color = 'red';
+    
+    if (totalScore > 70) {
+      riskLevel = 'LOW';
+      color = 'green';
+    } else if (totalScore > 40) {
+      riskLevel = 'MEDIUM';
+      color = 'orange';
+    }
+    
+    res.json({
+      success: true,
+      riskScore: Math.round(totalScore),
+      riskLevel: riskLevel,
+      color: color,
+      factors: riskFactors,
+      recommendations: riskLevel === 'HIGH' ? 
+        ['Require collateral', 'Higher interest rate', 'Shorter repayment period'] :
+        riskLevel === 'MEDIUM' ? 
+        ['Standard terms', 'Moderate interest rate'] :
+        ['Favorable terms', 'Lower interest rate']
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mock IPFS upload (in production, connect to real IPFS)
+app.post('/api/ipfs-upload', upload.single('document'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    // Mock IPFS hash generation
+    const mockCid = 'Qm' + Math.random().toString(36).substring(2) + 
+                   Math.random().toString(36).substring(2);
+    
+    res.json({
+      success: true,
+      cid: mockCid,
+      ipfsUrl: `ipfs://${mockCid}`,
+      gatewayUrl: `https://ipfs.io/ipfs/${mockCid}`,
+      fileName: req.file.originalname
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get invoice statistics
+app.get('/api/stats', (req, res) => {
+  const mockStats = {
+    totalInvoices: 245,
+    totalFinanced: 178,
+    totalVolume: '5,430,250',
+    defaultRate: '2.3%',
+    avgInterestRate: '12.5%',
+    activeInvestors: 89,
+    activeMSMEs: 156
+  };
+  
+  res.json(mockStats);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: err.message });
+});
+
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+  console.log(`Backend server running on port ${PORT}`);
+  console.log(`API Base URL: http://localhost:${PORT}`);
+  console.log('Endpoints:');
+  console.log(`  GET  / - API Information`);
+  console.log(`  POST /api/upload - Upload invoice document`);
+  console.log(`  POST /api/risk-score - Calculate risk score`);
+  console.log(`  POST /api/ipfs-upload - Upload to IPFS`);
+  console.log(`  GET  /api/stats - Get platform statistics`);
+});
