@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InvoiceFin - MSME Invoice Financing Platform</title>
     
+    <!-- Favicon to prevent 404 error -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.4/dist/web3.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <script>
@@ -58,6 +62,10 @@
         .btn-primary:hover {
             box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
             transform: translateY(-1px);
+        }
+        
+        .page-transition {
+            transition: opacity 0.3s ease-in-out;
         }
         
         .invoice-card {
@@ -168,25 +176,67 @@
             bottom: 0;
             background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
         }
+
+        /* Loading spinner */
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Notification styles */
+        .notification {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Small loading spinner for buttons */
+        .loading-spinner-small {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
     </style>
 </head>
 
 <body class="bg-dot-pattern text-gray-900 min-h-screen flex flex-col">
-
+    
     <!-- Navigation -->
     <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <a href="#home" class="flex items-center gap-2 cursor-pointer group no-underline">
-           <div class="w-8 h-8 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold group-hover:scale-105 transition-transform">
+        <a href="#home" class="flex items-center gap-2 cursor-pointer no-underline" onclick="showPage('home')">
+           <div class="w-8 h-8 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold">
              IF
            </div>
            <span class="font-bold text-lg tracking-tight text-gray-900">Invoice<span class="text-blue-600">Fin</span></span>
         </a>
 
         <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-          <a href="#marketplace" class="hover:text-blue-600 cursor-pointer transition-colors">Marketplace</a>
-          <a href="#portfolio" class="hover:text-blue-600 cursor-pointer transition-colors">My Portfolio</a>
-          <a href="#create" class="hover:text-blue-600 cursor-pointer transition-colors">Create Invoice</a>
-          <a href="#stats" class="hover:text-blue-600 cursor-pointer transition-colors">Platform Stats</a>
+          <button onclick="showPage('marketplace')" class="hover:text-blue-600 cursor-pointer transition-colors">Marketplace</button>
+          <button onclick="showPage('portfolio')" class="hover:text-blue-600 cursor-pointer transition-colors">My Portfolio</button>
+          <button onclick="showPage('create')" class="hover:text-blue-600 cursor-pointer transition-colors">Create Invoice</button>
+          <button onclick="showPage('stats')" class="hover:text-blue-600 cursor-pointer transition-colors">Platform Stats</button>
         </div>
 
         <div class="flex gap-3">
@@ -194,127 +244,130 @@
                 <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                 <span class="text-sm text-gray-600" id="accountAddress"></span>
             </div>
-            <button id="connectWallet" class="bg-gray-900 text-white px-5 py-2 rounded-full font-medium text-sm hover:bg-gray-800 transition-colors flex items-center gap-2">
+            <button id="connectWallet" onclick="connectWallet()" class="bg-gray-900 text-white px-5 py-2 rounded-full font-medium text-sm hover:bg-gray-800 transition-colors flex items-center gap-2">
                 <i data-lucide="wallet" class="w-4 h-4"></i>
-                Connect Wallet
+                <span id="connectWalletText">Connect Wallet</span>
             </button>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="flex-grow container mx-auto px-4 py-8">
+    <!-- Main Content Area -->
+    <main id="mainContent" class="flex-grow">
         
-        <!-- Hero Section -->
-        <section id="home" class="text-center py-12 mb-12">
-            <div class="inline-block p-2 px-4 rounded-full bg-white text-blue-700 text-xs font-bold uppercase tracking-wide mb-6 border border-blue-100 shadow-sm">
-                Decentralized Invoice Financing
-            </div>
-            <h1 class="text-5xl md:text-6xl font-bold text-gray-900 tracking-tight mb-6">
-                Unlock Cash Flow for <br />
-                <span class="gradient-text">MSME Businesses</span>
-            </h1>
-            <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-                A blockchain-powered marketplace connecting MSMEs with investors. 
-                Convert unpaid invoices into working capital through transparent, secure smart contracts.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#marketplace" class="btn-primary text-white px-8 py-3 rounded-full font-medium text-lg shadow-lg shadow-blue-200 flex items-center gap-2 justify-center">
-                    Explore Marketplace <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </a>
-                <a href="#create" class="bg-white border border-gray-200 text-gray-700 px-8 py-3 rounded-full font-medium text-lg hover:bg-gray-50 flex items-center gap-2 justify-center">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                    Create Invoice NFT
-                </a>
-            </div>
-            
-            <!-- Quick Stats -->
-            <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-blue-600" id="totalInvoices">0</div>
-                    <div class="text-sm text-gray-500">Total Invoices</div>
+        <!-- Home Page (Default) -->
+        <div id="home" class="page page-transition">
+            <div class="text-center py-16 px-4">
+                <div class="inline-block p-2 px-4 rounded-full bg-white text-blue-700 text-xs font-bold uppercase tracking-wide mb-6 border border-blue-100 shadow-sm">
+                    Decentralized Invoice Financing
                 </div>
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-emerald-500" id="totalFinanced">0</div>
-                    <div class="text-sm text-gray-500">Financed Invoices</div>
+                <h1 class="text-5xl md:text-6xl font-bold text-gray-900 tracking-tight mb-6">
+                    Unlock Cash Flow for <br />
+                    <span class="gradient-text">MSME Businesses</span>
+                </h1>
+                <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+                    A blockchain-powered marketplace connecting MSMEs with investors. 
+                    Convert unpaid invoices into working capital through transparent, secure smart contracts.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onclick="showPage('marketplace')" class="btn-primary text-white px-8 py-3 rounded-full font-medium text-lg shadow-lg shadow-blue-200 flex items-center gap-2 justify-center">
+                        Explore Marketplace <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="showPage('create')" class="bg-white border border-gray-200 text-gray-700 px-8 py-3 rounded-full font-medium text-lg hover:bg-gray-50 flex items-center gap-2 justify-center">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        Create Invoice NFT
+                    </button>
                 </div>
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-amber-500" id="defaultRate">0%</div>
-                    <div class="text-sm text-gray-500">Default Rate</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-purple-600" id="activeInvestors">0</div>
-                    <div class="text-sm text-gray-500">Active Investors</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- How It Works -->
-        <section id="features" class="py-12 bg-white/50 backdrop-blur-sm border border-gray-100 rounded-2xl mb-12 highlight-section">
-            <div class="max-w-7xl mx-auto px-6">
-                <div class="text-center mb-12">
-                    <h2 class="text-3xl font-bold text-gray-900 mb-4">How Invoice Financing Works</h2>
-                    <p class="text-gray-500 max-w-2xl mx-auto">A seamless process from invoice creation to financing and settlement</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4">
-                            <i data-lucide="file-text" class="w-6 h-6"></i>
-                        </div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">1. Create Invoice NFT</h3>
-                        <p class="text-gray-500 text-sm leading-relaxed">MSMEs upload verified invoices as NFTs on the blockchain with buyer details, amount, and due date.</p>
+                
+                <!-- Quick Stats -->
+                <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-blue-600" id="totalInvoices">0</div>
+                        <div class="text-sm text-gray-500">Total Invoices</div>
                     </div>
-
-                    <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-4">
-                            <i data-lucide="handshake" class="w-6 h-6"></i>
-                        </div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">2. Investor Financing</h3>
-                        <p class="text-gray-500 text-sm leading-relaxed">Investors browse available invoices, offer financing terms, and transfer funds to MSMEs instantly.</p>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-emerald-500" id="totalFinanced">0</div>
+                        <div class="text-sm text-gray-500">Financed Invoices</div>
                     </div>
-
-                    <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-4">
-                            <i data-lucide="check-circle" class="w-6 h-6"></i>
-                        </div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">3. Settlement & Returns</h3>
-                        <p class="text-gray-500 text-sm leading-relaxed">Buyers settle invoices directly to investors, who receive principal plus interest through smart contracts.</p>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-amber-500" id="defaultRate">0%</div>
+                        <div class="text-sm text-gray-500">Default Rate</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-purple-600" id="activeInvestors">0</div>
+                        <div class="text-sm text-gray-500">Active Investors</div>
                     </div>
                 </div>
-            </div>
-        </section>
+                
+                <!-- How It Works -->
+                <section class="py-12 mt-12">
+                    <div class="max-w-7xl mx-auto px-6">
+                        <div class="text-center mb-12">
+                            <h2 class="text-3xl font-bold text-gray-900 mb-4">How Invoice Financing Works</h2>
+                            <p class="text-gray-500 max-w-2xl mx-auto">A seamless process from invoice creation to financing and settlement</p>
+                        </div>
 
-        <!-- Marketplace Section -->
-        <section id="marketplace" class="mb-12">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+                                    <i data-lucide="file-text" class="w-6 h-6"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">1. Create Invoice NFT</h3>
+                                <p class="text-gray-500 text-sm leading-relaxed">MSMEs upload verified invoices as NFTs on the blockchain with buyer details, amount, and due date.</p>
+                            </div>
+
+                            <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-4">
+                                    <i data-lucide="handshake" class="w-6 h-6"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">2. Investor Financing</h3>
+                                <p class="text-gray-500 text-sm leading-relaxed">Investors browse available invoices, offer financing terms, and transfer funds to MSMEs instantly.</p>
+                            </div>
+
+                            <div class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-4">
+                                    <i data-lucide="check-circle" class="w-6 h-6"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">3. Settlement & Returns</h3>
+                                <p class="text-gray-500 text-sm leading-relaxed">Buyers settle invoices directly to investors, who receive principal plus interest through smart contracts.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Marketplace Page -->
+        <div id="marketplace" class="page page-transition hidden container mx-auto px-4 py-8">
             <div class="flex justify-between items-center mb-8">
                 <div>
                     <h2 class="text-3xl font-bold text-gray-900">Invoice Marketplace</h2>
                     <p class="text-gray-500 mt-2">Browse available invoices for investment opportunities</p>
                 </div>
                 <div class="flex gap-3">
-                    <select class="border border-gray-200 rounded-lg px-4 py-2 text-sm">
-                        <option>All Risk Levels</option>
-                        <option>Low Risk (1-3)</option>
-                        <option>Medium Risk (4-7)</option>
-                        <option>High Risk (8-10)</option>
+                    <select id="riskFilter" class="border border-gray-200 rounded-lg px-4 py-2 text-sm" onchange="loadMarketplace()">
+                        <option value="all">All Risk Levels</option>
+                        <option value="low">Low Risk (700-1000)</option>
+                        <option value="medium">Medium Risk (400-699)</option>
+                        <option value="high">High Risk (100-399)</option>
                     </select>
-                    <button onclick="loadMarketplace()" class="bg-white border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
-                        <i data-lucide="refresh-cw" class="w-4 h-4 inline mr-1"></i> Refresh
+                    <button onclick="loadMarketplace()" class="bg-white border border-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        Refresh
                     </button>
                 </div>
             </div>
 
             <div id="marketplaceContent" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Invoices will be loaded here -->
-                <div class="text-center py-12">
-                    <div class="spinner-border text-blue-600" role="status"></div>
+                <!-- Invoices will be loaded here dynamically -->
+                <div class="text-center py-12 col-span-3">
+                    <div class="loading-spinner mx-auto"></div>
                     <p class="mt-3 text-gray-500">Loading marketplace invoices...</p>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- Portfolio Section -->
-        <section id="portfolio" class="mb-12">
+        <!-- Portfolio Page -->
+        <div id="portfolio" class="page page-transition hidden container mx-auto px-4 py-8">
             <h2 class="text-3xl font-bold text-gray-900 mb-8">My Portfolio</h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -323,6 +376,9 @@
                     <div class="flex items-center gap-2 mb-4">
                         <i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i>
                         <h3 class="font-bold text-gray-900">My Invoices</h3>
+                        <button onclick="loadPortfolio()" class="ml-auto text-gray-400 hover:text-gray-600">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
                     </div>
                     <div id="myInvoices" class="space-y-4">
                         <p class="text-gray-500">Connect your wallet to view your invoices</p>
@@ -334,172 +390,271 @@
                     <div class="flex items-center gap-2 mb-4">
                         <i data-lucide="trending-up" class="w-5 h-5 text-emerald-600"></i>
                         <h3 class="font-bold text-gray-900">My Investments</h3>
+                        <button onclick="loadPortfolio()" class="ml-auto text-gray-400 hover:text-gray-600">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
                     </div>
                     <div id="myInvestments" class="space-y-4">
                         <p class="text-gray-500">Connect your wallet to view your investments</p>
                     </div>
                 </div>
             </div>
-        </section>
+            
+            <!-- Investment Stats -->
+            <div id="investmentStats" class="mt-6"></div>
+            
+            <!-- Investment History -->
+            <div class="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-gray-900">Investment History</h3>
+                    <button onclick="loadInvestmentHistory()" class="text-sm text-blue-600 hover:text-blue-700">
+                        Refresh History
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return</th>
+                            </tr>
+                        </thead>
+                        <tbody id="investmentHistory" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                    No investment history found
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-        <!-- Create Invoice Section -->
-        <section id="create" class="mb-12">
-            <div class="create-invoice-section p-8 md:p-12 rounded-2xl">
-                <div class="max-w-2xl mx-auto text-center relative z-10">
-                    <div class="inline-block p-2 px-4 rounded-full bg-white/20 text-white text-xs font-bold uppercase tracking-wide mb-6">
-                        Get Funded in Minutes
-                    </div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">
-                        Need Working Capital?
-                    </h2>
-                    <p class="text-white/90 text-lg mb-10 max-w-xl mx-auto">
-                        Convert your unpaid invoices into immediate cash flow. Create an invoice NFT and get funded by investors within minutes.
-                    </p>
-                    
-                    <!-- Quick Create Form -->
-                    <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 mb-8">
-                        <h3 class="text-xl font-bold text-white mb-6">Quick Invoice Creation</h3>
-                        <form id="quickCreateForm" class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <input type="text" placeholder="Buyer Address (0x...)" 
-                                           class="w-full bg-white/10 border border-white/30 text-white rounded-lg px-4 py-3 placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-white/50 outline-none">
+        <!-- Create Invoice Page -->
+        <div id="create" class="page page-transition hidden container mx-auto px-4 py-8">
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Create Invoice NFT</h2>
+                <p class="text-gray-500 mb-8">Convert your unpaid invoices into immediate cash flow</p>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Form Section -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                            <form id="createInvoiceForm" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Buyer Address</label>
+                                        <input type="text" id="buyerAddress" placeholder="0x..." 
+                                               class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Invoice Amount (ETH)</label>
+                                        <input type="number" id="invoiceAmount" step="0.01" min="0.01" 
+                                               class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
+                                    </div>
                                 </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                                        <input type="date" id="dueDate"
+                                               class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Invoice Number</label>
+                                        <input type="text" id="invoiceNumber"
+                                               class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
+                                    </div>
+                                </div>
+                                
                                 <div>
-                                    <input type="text" placeholder="Invoice Amount (ETH)" 
-                                           class="w-full bg-white/10 border border-white/30 text-white rounded-lg px-4 py-3 placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-white/50 outline-none">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                    <textarea rows="3" id="description"
+                                              class="w-full border border-gray-200 rounded-lg px-4 py-3" 
+                                              placeholder="Describe the goods or services provided"></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Document Hash (IPFS)</label>
+                                    <input type="text" id="documentHash" placeholder="Qm..." 
+                                           class="w-full border border-gray-200 rounded-lg px-4 py-3" 
+                                           value="QmSampleHash123" required>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Risk Score (1-1000)</label>
+                                    <input type="number" id="riskScore" min="1" max="1000" value="500"
+                                           class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Terms & Conditions</label>
+                                    <div class="space-y-2">
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="legitimateTransaction" class="rounded border-gray-300" required>
+                                            <span class="ml-2 text-sm text-gray-600">I confirm this invoice represents a legitimate business transaction</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="agreeTerms" class="rounded border-gray-300" required>
+                                            <span class="ml-2 text-sm text-gray-600">I agree to the InvoiceFin Terms of Service</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" id="createInvoiceBtn" class="btn-primary text-white w-full py-4 rounded-lg font-medium text-lg">
+                                    <i data-lucide="upload" class="w-5 h-5 inline mr-2"></i>
+                                    Create Invoice NFT
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Info Section -->
+                    <div>
+                        <div class="bg-blue-50 border border-blue-100 rounded-2xl p-6 mb-6">
+                            <h4 class="font-bold text-gray-900 mb-3">Why Create an Invoice NFT?</h4>
+                            <ul class="space-y-3 text-sm text-gray-600">
+                                <li class="flex items-start gap-2">
+                                    <i data-lucide="zap" class="w-4 h-4 text-blue-600 mt-0.5"></i>
+                                    <span>Get funded within 24 hours</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i data-lucide="shield" class="w-4 h-4 text-blue-600 mt-0.5"></i>
+                                    <span>Secure transaction on blockchain</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i data-lucide="dollar-sign" class="w-4 h-4 text-blue-600 mt-0.5"></i>
+                                    <span>No hidden fees or long contracts</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i data-lucide="clock" class="w-4 h-4 text-blue-600 mt-0.5"></i>
+                                    <span>Transparent settlement process</span>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6">
+                            <h4 class="font-bold text-gray-900 mb-3">Recent Activity</h4>
+                            <div id="recentActivity" class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="font-medium text-sm">Invoice #1002</div>
+                                        <div class="text-xs text-gray-500">Funded 2 hours ago</div>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded">5.8 ETH</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="font-medium text-sm">Invoice #1001</div>
+                                        <div class="text-xs text-gray-500">Settled yesterday</div>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">3.2 ETH</span>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <input type="date" 
-                                           class="w-full bg-white/10 border border-white/30 text-white rounded-lg px-4 py-3 placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-white/50 outline-none">
-                                </div>
-                                <div>
-                                    <input type="text" placeholder="Invoice Number" 
-                                           class="w-full bg-white/10 border border-white/30 text-white rounded-lg px-4 py-3 placeholder-white/50 focus:ring-2 focus:ring-white/50 focus:border-white/50 outline-none">
-                                </div>
-                            </div>
-                            <button type="submit" class="btn-primary text-white w-full py-3 rounded-lg font-medium mt-4 bg-white/20 hover:bg-white/30 border border-white/30">
-                                <i data-lucide="zap" class="w-5 h-5 inline mr-2"></i>
-                                Create Invoice NFT Now
-                            </button>
-                        </form>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-white/80">
-                        <div class="flex items-center gap-3 justify-center">
-                            <i data-lucide="zap" class="w-5 h-5 text-white"></i>
-                            <span class="text-sm">Instant Funding</span>
-                        </div>
-                        <div class="flex items-center gap-3 justify-center">
-                            <i data-lucide="shield" class="w-5 h-5 text-white"></i>
-                            <span class="text-sm">Secure & Transparent</span>
-                        </div>
-                        <div class="flex items-center gap-3 justify-center">
-                            <i data-lucide="clock" class="w-5 h-5 text-white"></i>
-                            <span class="text-sm">No Long Contracts</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- Platform Stats -->
-        <section id="stats" class="mb-12">
+        <!-- Platform Stats Page -->
+        <div id="stats" class="page page-transition hidden container mx-auto px-4 py-8">
             <h2 class="text-3xl font-bold text-gray-900 mb-8">Platform Statistics</h2>
             
-            <div id="platformStats" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <!-- Stats will be loaded here -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="stat-card">
-                    <div class="text-2xl font-bold text-gray-900">--</div>
+                    <div class="text-2xl font-bold text-gray-900" id="statTotalInvoices">0</div>
                     <div class="text-sm text-gray-500">Total Invoices</div>
                 </div>
                 <div class="stat-card">
-                    <div class="text-2xl font-bold text-gray-900">--</div>
+                    <div class="text-2xl font-bold text-gray-900" id="statFinanced">0</div>
                     <div class="text-sm text-gray-500">Financed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="text-2xl font-bold text-gray-900">--</div>
+                    <div class="text-2xl font-bold text-gray-900" id="statDefaultRate">0%</div>
                     <div class="text-sm text-gray-500">Default Rate</div>
                 </div>
                 <div class="stat-card">
-                    <div class="text-2xl font-bold text-gray-900">--</div>
+                    <div class="text-2xl font-bold text-gray-900" id="statActiveInvestors">0</div>
                     <div class="text-sm text-gray-500">Active Investors</div>
                 </div>
             </div>
             
-            <!-- Additional Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <!-- Detailed Stats -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <h4 class="font-bold text-gray-900 mb-4">Investment Volume</h4>
-                    <div class="space-y-3">
+                    <h4 class="font-bold text-gray-900 mb-6">Platform Volume</h4>
+                    <div class="space-y-4">
                         <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600">This Month</span>
-                                <span class="font-medium text-gray-900">245.8 ETH</span>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-600">Total Volume</span>
+                                <span class="font-medium text-gray-900" id="totalVolume">0 ETH</span>
                             </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill bg-blue-600" style="width: 75%"></div>
+                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-600" id="volumeProgress" style="width: 0%"></div>
                             </div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600">Last Month</span>
-                                <span class="font-medium text-gray-900">198.3 ETH</span>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-600">Average Invoice Size</span>
+                                <span class="font-medium text-gray-900" id="avgInvoiceSize">0 ETH</span>
                             </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill bg-emerald-500" style="width: 65%"></div>
+                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-500" id="avgSizeProgress" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <h4 class="font-bold text-gray-900 mb-4">Average Returns</h4>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-emerald-600 mb-2">12.8%</div>
-                        <p class="text-sm text-gray-500">Average investor APR</p>
-                        <div class="mt-4 flex items-center justify-center gap-2 text-sm">
-                            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-500"></i>
-                            <span class="text-gray-600">+2.4% from last quarter</span>
+                    <h4 class="font-bold text-gray-900 mb-6">Performance Metrics</h4>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <div class="text-3xl font-bold text-emerald-600 mb-2" id="avgInterestRate">0%</div>
+                            <div class="text-sm text-gray-500">Average Interest Rate</div>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <h4 class="font-bold text-gray-900 mb-4">Success Rate</h4>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">98.2%</div>
-                        <p class="text-sm text-gray-500">Invoices successfully financed</p>
-                        <div class="mt-4">
-                            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                <i data-lucide="star" class="w-3 h-3 inline mr-1"></i>
-                                Excellent Rating
-                            </span>
+                        <div>
+                            <div class="text-3xl font-bold text-blue-600 mb-2" id="successRate">0%</div>
+                            <div class="text-sm text-gray-500">Success Rate</div>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+            
+            <!-- Recent Transactions -->
+            <div class="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h4 class="font-bold text-gray-900">Recent Transactions</h4>
+                    <button onclick="loadRecentTransactions()" class="text-sm text-blue-600 hover:text-blue-700">
+                        Refresh
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentTransactions" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                                    Loading transactions...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-        <!-- Call to Action -->
-        <section class="mb-12 text-center">
-            <div class="bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-100 rounded-2xl p-8 md:p-12">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Ready to Get Started?</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto mb-8">
-                    Join hundreds of MSMEs and investors already using InvoiceFin to unlock liquidity and earn returns.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a href="#marketplace" class="bg-gray-900 text-white px-8 py-3 rounded-full font-medium hover:bg-gray-800 transition-colors">
-                        Explore Marketplace
-                    </a>
-                    <a href="#create" class="btn-primary text-white px-8 py-3 rounded-full font-medium">
-                        Create Your First Invoice
-                    </a>
-                </div>
-            </div>
-        </section>
     </main>
 
     <!-- Invest Modal -->
@@ -525,6 +680,10 @@
                     <span class="text-sm text-gray-500">MSME:</span>
                     <span id="modalInvoiceMSME" class="ml-2 font-medium text-gray-900"></span>
                 </div>
+                <div>
+                    <span class="text-sm text-gray-500">Due Date:</span>
+                    <span id="modalInvoiceDueDate" class="ml-2 font-medium text-gray-900"></span>
+                </div>
             </div>
             
             <form id="investForm" class="space-y-4">
@@ -540,7 +699,7 @@
                            class="w-full border border-gray-200 rounded-lg px-4 py-3" required>
                 </div>
                 
-                <button type="submit" class="btn-primary text-white w-full py-3 rounded-lg font-medium">
+                <button type="submit" id="investBtn" class="btn-primary text-white w-full py-3 rounded-lg font-medium">
                     <i data-lucide="check" class="w-5 h-5 inline mr-2"></i>
                     Submit Investment
                 </button>
@@ -550,316 +709,1049 @@
 
     <!-- Footer -->
     <footer class="bg-white border-t border-gray-200 mt-12">
-        <div class="container mx-auto px-4 py-6">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="flex items-center gap-2 mb-4 md:mb-0">
-                    <div class="w-6 h-6 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded flex items-center justify-center text-white text-xs font-bold">
-                        IF
+        <div class="container mx-auto px-4 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-tr from-blue-600 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold">
+                            IF
+                        </div>
+                        <span class="font-bold text-gray-900 text-lg">Invoice<span class="text-blue-600">Fin</span></span>
                     </div>
-                    <span class="font-bold text-gray-900">Invoice<span class="text-blue-600">Fin</span></span>
+                    <p class="text-gray-500 text-sm">
+                        Empowering MSMEs with blockchain-powered invoice financing solutions.
+                    </p>
                 </div>
                 
-                <div class="flex gap-6 text-sm text-gray-500">
-                    <a href="#marketplace" class="hover:text-blue-600">Marketplace</a>
-                    <a href="#portfolio" class="hover:text-blue-600">Portfolio</a>
-                    <a href="#create" class="hover:text-blue-600">Create Invoice</a>
-                    <a href="#stats" class="hover:text-blue-600">Platform Stats</a>
+                <div>
+                    <h5 class="font-bold text-gray-900 mb-4">Platform</h5>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li><button onclick="showPage('marketplace')" class="hover:text-blue-600">Marketplace</button></li>
+                        <li><button onclick="showPage('portfolio')" class="hover:text-blue-600">Portfolio</button></li>
+                        <li><button onclick="showPage('create')" class="hover:text-blue-600">Create Invoice</button></li>
+                        <li><button onclick="showPage('stats')" class="hover:text-blue-600">Platform Stats</button></li>
+                    </ul>
                 </div>
                 
-                <div class="mt-4 md:mt-0 text-sm text-gray-400">
-                    © 2024 InvoiceFin. All rights reserved.
+                <div>
+                    <h5 class="font-bold text-gray-900 mb-4">Resources</h5>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li><a href="#" class="hover:text-blue-600">Documentation</a></li>
+                        <li><a href="#" class="hover:text-blue-600">API Reference</a></li>
+                        <li><a href="#" class="hover:text-blue-600">Help Center</a></li>
+                        <li><a href="#" class="hover:text-blue-600">Community</a></li>
+                    </ul>
                 </div>
+                
+                <div>
+                    <h5 class="font-bold text-gray-900 mb-4">Contact</h5>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="mail" class="w-4 h-4"></i>
+                            <span>support@invoicefin.com</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="twitter" class="w-4 h-4"></i>
+                            <span>@invoicefin</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i data-lucide="message-circle" class="w-4 h-4"></i>
+                            <span>Discord Community</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-400">
+                © 2024 InvoiceFin. All rights reserved. | <a href="#" class="hover:text-blue-600">Privacy Policy</a> | <a href="#" class="hover:text-blue-600">Terms of Service</a>
             </div>
         </div>
     </footer>
 
     <!-- JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
+        // Initialize icons
+        lucide.createIcons();
+        
         // Global variables
         let web3;
         let currentAccount;
         let invoiceNFTContract;
         let financingContract;
-        const API_URL = 'http://localhost:5000';
         
-        // Initialize icons
-        lucide.createIcons();
+        // Store current invoice data for investment
+        let currentInvoiceData = {};
         
-        // Initialize when page loads
-        window.addEventListener('load', async () => {
-            await initWeb3();
-            await loadContracts();
-            updateUI();
-            loadData();
-        });
+        // Contract addresses (update with your deployed addresses)
+        const CONTRACT_ADDRESSES = {
+            invoiceNFT: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+            invoiceFinancing: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+        };
         
-        async function initWeb3() {
-            if (window.ethereum) {
-                web3 = new Web3(window.ethereum);
-                try {
-                    // Request account access
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    currentAccount = accounts[0];
-                    console.log('Connected account:', currentAccount);
-                } catch (error) {
-                    console.error('User denied account access');
-                }
-            } else {
-                alert('Please install MetaMask!');
+        // Backend API URL
+        const API_URL = 'http://localhost:3001';
+        
+        // Contract ABIs (simplified versions for demo)
+        const INVOICE_NFT_ABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [
+                    {"internalType": "address", "name": "buyer", "type": "address"},
+                    {"internalType": "uint256", "name": "invoiceAmount", "type": "uint256"},
+                    {"internalType": "uint256", "name": "dueDate", "type": "uint256"},
+                    {"internalType": "string", "name": "documentHash", "type": "string"},
+                    {"internalType": "string", "name": "invoiceNumber", "type": "string"},
+                    {"internalType": "string", "name": "description", "type": "string"},
+                    {"internalType": "uint256", "name": "riskScore", "type": "uint256"}
+                ],
+                "name": "createInvoice",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+                "name": "getInvoiceDetails",
+                "outputs": [
+                    {"internalType": "address", "name": "msme", "type": "address"},
+                    {"internalType": "address", "name": "buyer", "type": "address"},
+                    {"internalType": "uint256", "name": "amount", "type": "uint256"},
+                    {"internalType": "uint256", "name": "dueDate", "type": "uint256"},
+                    {"internalType": "string", "name": "documentHash", "type": "string"},
+                    {"internalType": "string", "name": "invoiceNumber", "type": "string"},
+                    {"internalType": "string", "name": "description", "type": "string"},
+                    {"internalType": "bool", "name": "isFinanced", "type": "bool"},
+                    {"internalType": "bool", "name": "isSettled", "type": "bool"},
+                    {"internalType": "uint256", "name": "riskScore", "type": "uint256"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "totalSupply",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
             }
-        }
+        ];
         
-        async function loadContracts() {
+        const FINANCING_ABI = [
+            {
+                "inputs": [{"internalType": "address", "name": "_invoiceNFT", "type": "address"}],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+                    {"internalType": "uint256", "name": "financingAmount", "type": "uint256"},
+                    {"internalType": "uint256", "name": "interestRate", "type": "uint256"}
+                ],
+                "name": "offerFinancing",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "msme", "type": "address"}],
+                "name": "getMSMEInvoices",
+                "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "investor", "type": "address"}],
+                "name": "getInvestorPortfolio",
+                "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+        
+        // Initialize application
+        async function initApp() {
             try {
-                // Load contract addresses
-                const response = await fetch('/contract-addresses.json');
-                const addresses = await response.json();
+                console.log('Initializing app...');
                 
-                // Load ABI (simplified for this example)
-                const invoiceNFTABI = [
-                    {
-                        "constant": true,
-                        "inputs": [],
-                        "name": "totalSupply",
-                        "outputs": [{"name": "", "type": "uint256"}],
-                        "type": "function"
+                // Check if wallet is already connected
+                if (typeof window.ethereum !== 'undefined') {
+                    web3 = new Web3(window.ethereum);
+                    
+                    // Initialize contracts
+                    initializeContracts();
+                    
+                    // Check for existing accounts
+                    try {
+                        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                        if (accounts.length > 0) {
+                            currentAccount = accounts[0];
+                            updateWalletUI(currentAccount);
+                            console.log('Auto-connected to wallet:', currentAccount);
+                        }
+                    } catch (error) {
+                        console.log('No auto-connected wallet found');
                     }
-                ];
+                } else {
+                    console.log('MetaMask not detected');
+                }
                 
-                const financingABI = [
-                    {
-                        "constant": true,
-                        "inputs": [],
-                        "name": "totalInvoices",
-                        "outputs": [{"name": "", "type": "uint256"}],
-                        "type": "function"
-                    }
-                ];
+                // Load initial data
+                loadInitialData();
                 
-                // Create contract instances
-                invoiceNFTContract = new web3.eth.Contract(invoiceNFTABI, addresses.invoiceNFT);
-                financingContract = new web3.eth.Contract(financingABI, addresses.invoiceFinancing);
-                
-                console.log('Contracts loaded');
             } catch (error) {
-                console.error('Error loading contracts:', error);
+                console.error('Error initializing app:', error);
             }
         }
         
-        function updateUI() {
+        // Update wallet UI
+        function updateWalletUI(account) {
             const walletInfo = document.getElementById('walletInfo');
             const connectBtn = document.getElementById('connectWallet');
+            const connectText = document.getElementById('connectWalletText');
+            const accountAddress = document.getElementById('accountAddress');
             
-            if (currentAccount) {
-                walletInfo.classList.remove('hidden');
-                document.getElementById('accountAddress').textContent = 
-                    currentAccount.substring(0, 10) + '...';
-                connectBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Connected';
-                connectBtn.disabled = true;
-                connectBtn.classList.remove('bg-gray-900', 'hover:bg-gray-800');
-                connectBtn.classList.add('bg-emerald-500');
+            if (account && accountAddress) {
+                accountAddress.textContent = 
+                    `${account.substring(0, 6)}...${account.substring(account.length - 4)}`;
+                
+                if (walletInfo) walletInfo.classList.remove('hidden');
+                if (connectText) connectText.textContent = 'Connected';
+                if (connectBtn) {
+                    connectBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Connected';
+                    connectBtn.classList.remove('bg-gray-900', 'hover:bg-gray-800');
+                    connectBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+                }
             }
         }
         
+        // Page Management
+        function showPage(pageId) {
+            console.log('Showing page:', pageId);
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+                page.classList.remove('opacity-100');
+                page.classList.add('opacity-0');
+            });
+            
+            // Show selected page
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.classList.remove('hidden');
+                setTimeout(() => {
+                    targetPage.classList.remove('opacity-0');
+                    targetPage.classList.add('opacity-100');
+                }, 10);
+                
+                // Load page-specific data
+                if (pageId === 'marketplace') {
+                    loadMarketplace();
+                } else if (pageId === 'portfolio') {
+                    loadPortfolio();
+                } else if (pageId === 'stats') {
+                    loadPlatformStats();
+                }
+            }
+        }
+        
+        // Wallet connection
         async function connectWallet() {
-            if (window.ethereum) {
+            console.log('Connecting wallet...');
+            if (typeof window.ethereum !== 'undefined') {
                 try {
                     const accounts = await window.ethereum.request({ 
                         method: 'eth_requestAccounts' 
                     });
-                    currentAccount = accounts[0];
-                    updateUI();
-                    loadData();
+                    
+                    if (accounts.length > 0) {
+                        currentAccount = accounts[0];
+                        updateWalletUI(currentAccount);
+                        
+                        // Initialize contracts
+                        initializeContracts();
+                        
+                        // Load portfolio data
+                        loadPortfolio();
+                        
+                        // Show success message
+                        showNotification('Wallet connected successfully!', 'success');
+                        console.log('Wallet connected:', currentAccount);
+                    }
                 } catch (error) {
                     console.error('Error connecting wallet:', error);
+                    showNotification('Failed to connect wallet. Please try again.', 'error');
                 }
             } else {
-                alert('Please install MetaMask!');
+                showNotification('Please install MetaMask to connect your wallet!', 'error');
             }
         }
         
-        async function loadData() {
-            await loadPlatformStats();
-            await loadMarketplace();
-            await loadPortfolio();
+        // Initialize smart contracts
+        function initializeContracts() {
+            if (!web3) return;
+            
+            try {
+                invoiceNFTContract = new web3.eth.Contract(INVOICE_NFT_ABI, CONTRACT_ADDRESSES.invoiceNFT);
+                financingContract = new web3.eth.Contract(FINANCING_ABI, CONTRACT_ADDRESSES.invoiceFinancing);
+                
+                console.log('Contracts initialized successfully');
+            } catch (error) {
+                console.error('Error initializing contracts:', error);
+            }
         }
         
+        // Load initial data from backend
+        async function loadInitialData() {
+            try {
+                const response = await fetch(`${API_URL}/api/health`);
+                if (!response.ok) {
+                    console.warn('Backend server not running. Some features may be limited.');
+                    return;
+                }
+                
+                await loadPlatformStats();
+                
+            } catch (error) {
+                console.error('Error loading initial data:', error);
+            }
+        }
+        
+        // Load marketplace invoices
+        async function loadMarketplace() {
+            const contentDiv = document.getElementById('marketplaceContent');
+            if (!contentDiv) return;
+            
+            contentDiv.innerHTML = `
+                <div class="text-center py-12 col-span-3">
+                    <div class="loading-spinner mx-auto"></div>
+                    <p class="mt-3 text-gray-500">Loading marketplace invoices...</p>
+                </div>
+            `;
+            
+            try {
+                const riskFilter = document.getElementById('riskFilter').value;
+                const response = await fetch(`${API_URL}/api/invoices?riskLevel=${riskFilter}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch invoices');
+                }
+                
+                const invoices = await response.json();
+                
+                if (invoices.length === 0) {
+                    contentDiv.innerHTML = `
+                        <div class="text-center py-12 col-span-3">
+                            <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="file" class="w-6 h-6 text-gray-400"></i>
+                            </div>
+                            <p class="text-gray-500">No invoices available in the marketplace yet</p>
+                            <button onclick="showPage('create')" class="mt-4 btn-primary text-white px-6 py-2 rounded-lg">
+                                Create First Invoice
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let invoicesHTML = '';
+                
+                invoices.forEach(invoice => {
+                    const status = invoice.status;
+                    const amountInEth = invoice.amount || 0;
+                    
+                    // Format risk stars (1000 = 10 stars)
+                    const riskScore = invoice.riskScore || 500;
+                    const starCount = Math.floor(riskScore / 100);
+                    const riskStars = '★'.repeat(starCount) + '☆'.repeat(10 - starCount);
+                    
+                    invoicesHTML += `
+                        <div class="invoice-card ${status} bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 class="font-bold text-gray-900">Invoice #${invoice.invoiceNumber}</h4>
+                                    <div class="mt-2 space-y-1">
+                                        <div class="flex items-center text-sm">
+                                            <i data-lucide="dollar-sign" class="w-4 h-4 text-gray-400 mr-2"></i>
+                                            <span class="text-gray-900 font-medium">${amountInEth.toFixed(2)} ETH</span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <i data-lucide="calendar" class="w-4 h-4 text-gray-400 mr-2"></i>
+                                            <span class="text-gray-600">Due: ${new Date(invoice.dueDate).toLocaleDateString()}</span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <i data-lucide="user" class="w-4 h-4 text-gray-400 mr-2"></i>
+                                            <span class="text-gray-600">MSME: ${invoice.msmeAddress?.substring(0, 8)}...</span>
+                                        </div>
+                                        <div class="flex items-center text-sm">
+                                            <i data-lucide="shield" class="w-4 h-4 text-gray-400 mr-2"></i>
+                                            <span class="text-gray-600">Risk: ${riskScore} (${riskStars})</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="px-3 py-1 text-xs rounded-full ${status === 'pending' ? 'bg-emerald-100 text-emerald-700' : status === 'funded' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}">
+                                    ${status}
+                                </span>
+                            </div>
+                            ${status === 'pending' ? `
+                                <button onclick="openInvestModal('${invoice.id}', '${invoice.tokenId || invoice.id}', ${amountInEth}, '${invoice.msmeAddress}', '${new Date(invoice.dueDate).toLocaleDateString()}')" 
+                                        class="btn-primary text-white w-full py-2 rounded-lg text-sm font-medium">
+                                    <i data-lucide="trending-up" class="w-4 h-4 inline mr-2"></i>
+                                    Invest Now
+                                </button>
+                            ` : status === 'funded' ? `
+                                <button disabled class="bg-gray-100 text-gray-400 w-full py-2 rounded-lg text-sm font-medium">
+                                    <i data-lucide="lock" class="w-4 h-4 inline mr-2"></i>
+                                    Already Funded
+                                </button>
+                            ` : `
+                                <button disabled class="bg-gray-100 text-gray-400 w-full py-2 rounded-lg text-sm font-medium">
+                                    <i data-lucide="check-circle" class="w-4 h-4 inline mr-2"></i>
+                                    Settled
+                                </button>
+                            `}
+                        </div>
+                    `;
+                });
+                
+                contentDiv.innerHTML = invoicesHTML;
+                lucide.createIcons(); // Refresh icons
+                
+            } catch (error) {
+                console.error('Error loading marketplace:', error);
+                contentDiv.innerHTML = `
+                    <div class="text-center py-12 col-span-3">
+                        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="alert-circle" class="w-6 h-6 text-red-400"></i>
+                        </div>
+                        <p class="text-gray-500">Error loading marketplace. Please try again.</p>
+                        <button onclick="loadMarketplace()" class="mt-4 btn-primary text-white px-6 py-2 rounded-lg">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Submit investment - FIXED VERSION
+        async function submitInvestment(event) {
+            event.preventDefault();
+            
+            if (!currentAccount) {
+                showNotification('Please connect your wallet first', 'error');
+                return;
+            }
+            
+            // Use the stored invoice data
+            const tokenId = currentInvoiceData.tokenId;
+            const financingAmount = document.getElementById('financingAmount').value;
+            const interestRate = document.getElementById('interestRate').value;
+            const invoiceId = currentInvoiceData.invoiceId;
+            
+            console.log('Submitting investment with:', { tokenId, financingAmount, interestRate, invoiceId });
+            
+            if (!financingAmount || !interestRate) {
+                showNotification('Please enter both financing amount and interest rate', 'error');
+                return;
+            }
+            
+            const investBtn = document.getElementById('investBtn');
+            const originalText = investBtn.innerHTML;
+            
+            try {
+                // Disable button and show loading
+                investBtn.disabled = true;
+                investBtn.innerHTML = '<div class="loading-spinner-small"></div> Processing...';
+                
+                // Always use backend simulation mode for now
+                console.log('Using backend simulation mode');
+                const response = await fetch(`${API_URL}/api/invest`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tokenId: tokenId,
+                        financingAmount: parseFloat(financingAmount),
+                        interestRate: parseFloat(interestRate),
+                        investorAddress: currentAccount,
+                        invoiceId: invoiceId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showNotification('Investment submitted successfully!', 'success');
+                    
+                    if (result.blockchain && result.blockchain.required) {
+                        showNotification('Note: Blockchain transaction required for final settlement', 'warning');
+                    }
+                    
+                    // Close modal and reset form
+                    closeInvestModal();
+                    
+                    // Update marketplace and portfolio
+                    loadMarketplace();
+                    loadPortfolio();
+                    
+                } else {
+                    throw new Error(result.error || 'Failed to submit investment');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting investment:', error);
+                showNotification('Error: ' + error.message, 'error');
+            } finally {
+                // Reset button
+                investBtn.disabled = false;
+                investBtn.innerHTML = originalText;
+            }
+        }
+        
+        // Get investment details
+        async function getInvestmentDetails(investmentId) {
+            try {
+                const response = await fetch(`${API_URL}/api/investment/${investmentId}`);
+                if (response.ok) {
+                    return await response.json();
+                }
+                return null;
+            } catch (error) {
+                console.error('Error getting investment details:', error);
+                return null;
+            }
+        }
+        
+        // Get investor portfolio with investments
+        async function loadInvestorPortfolio(address) {
+            try {
+                const response = await fetch(`${API_URL}/api/investments/${address}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data;
+                }
+            } catch (error) {
+                console.error('Error loading investor portfolio:', error);
+            }
+        }
+        
+        // Settle invoice
+        async function settleInvoice(invoiceId, settlementAmount) {
+            try {
+                const response = await fetch(`${API_URL}/api/settle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        invoiceId: invoiceId,
+                        settlementAmount: parseFloat(settlementAmount),
+                        payerAddress: currentAccount
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('Invoice settled successfully!', 'success');
+                    return result;
+                } else {
+                    throw new Error(result.error || 'Failed to settle invoice');
+                }
+            } catch (error) {
+                console.error('Error settling invoice:', error);
+                showNotification('Error: ' + error.message, 'error');
+                return null;
+            }
+        }
+        
+        // Load portfolio from backend
+        async function loadPortfolio() {
+            if (!currentAccount) {
+                document.getElementById('myInvoices').innerHTML = '<p class="text-gray-500">Connect your wallet to view your portfolio</p>';
+                document.getElementById('myInvestments').innerHTML = '<p class="text-gray-500">Connect your wallet to view your investments</p>';
+                return;
+            }
+            
+            try {
+                // Get portfolio data
+                const portfolioResponse = await fetch(`${API_URL}/api/portfolio/${currentAccount}`);
+                if (!portfolioResponse.ok) {
+                    throw new Error('Failed to fetch portfolio');
+                }
+                
+                const portfolio = await portfolioResponse.json();
+                
+                if (!portfolio.success) {
+                    throw new Error(portfolio.error || 'Failed to load portfolio');
+                }
+                
+                // Display created invoices
+                let myInvoicesHTML = '';
+                if (portfolio.createdInvoices && portfolio.createdInvoices.length > 0) {
+                    portfolio.createdInvoices.forEach(invoice => {
+                        myInvoicesHTML += `
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
+                                <div>
+                                    <div class="font-medium text-gray-900">${invoice.invoiceNumber}</div>
+                                    <div class="text-sm text-gray-500">${invoice.amount.toFixed(2)} ETH • Due ${new Date(invoice.dueDate).toLocaleDateString()}</div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded ${invoice.status === 'pending' ? 'bg-blue-100 text-blue-700' : invoice.status === 'funded' ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'}">
+                                    ${invoice.status}
+                                </span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    myInvoicesHTML = '<p class="text-gray-500">No invoices created yet</p>';
+                }
+                
+                document.getElementById('myInvoices').innerHTML = myInvoicesHTML;
+                
+                // Display investments
+                let myInvestmentsHTML = '';
+                if (portfolio.investments && portfolio.investments.length > 0) {
+                    portfolio.investments.forEach(investment => {
+                        const invoice = portfolio.fundedInvoices && portfolio.fundedInvoices.find ? 
+                            portfolio.fundedInvoices.find(inv => inv.id === investment.invoiceId) : null;
+                        myInvestmentsHTML += `
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
+                                <div>
+                                    <div class="font-medium text-gray-900">${invoice ? invoice.invoiceNumber : 'Investment'}</div>
+                                    <div class="text-sm text-gray-500">${investment.financingAmount ? investment.financingAmount.toFixed(2) : '0.00'} ETH • ${investment.interestRate || '0'}% ROI</div>
+                                    <div class="text-xs text-gray-400">Status: ${investment.status || 'pending'}</div>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded ${investment.status === 'active' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">
+                                    ${investment.status === 'active' ? 'Active' : 'Settled'}
+                                </span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    myInvestmentsHTML = '<p class="text-gray-500">No investments yet</p>';
+                }
+                
+                document.getElementById('myInvestments').innerHTML = myInvestmentsHTML;
+                
+                // Update investment stats
+                const statsElement = document.getElementById('investmentStats');
+                if (statsElement && portfolio.totalInvested !== undefined) {
+                    statsElement.innerHTML = `
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <div class="text-center p-3 bg-blue-50 rounded-lg">
+                                <div class="text-lg font-bold text-blue-700">${portfolio.totalInvested ? portfolio.totalInvested.toFixed(2) : '0.00'} ETH</div>
+                                <div class="text-sm text-blue-600">Total Invested</div>
+                            </div>
+                            <div class="text-center p-3 bg-emerald-50 rounded-lg">
+                                <div class="text-lg font-bold text-emerald-700">${portfolio.totalReturns ? portfolio.totalReturns.toFixed(2) : '0.00'} ETH</div>
+                                <div class="text-sm text-emerald-600">Total Returns</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Load investment history
+                await loadInvestmentHistory();
+                
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+                document.getElementById('myInvoices').innerHTML = '<p class="text-red-500">Error loading portfolio data</p>';
+                document.getElementById('myInvestments').innerHTML = '<p class="text-red-500">Error loading investments</p>';
+            }
+        }
+        
+        // Load investment history - FIXED VERSION
+        async function loadInvestmentHistory() {
+            if (!currentAccount) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/investments/${currentAccount}`);
+                if (!response.ok) return;
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.log('No investments found:', result.error);
+                    return;
+                }
+                
+                // The API returns an object with investments array inside
+                const investments = result.investments || [];
+                const historyTable = document.getElementById('investmentHistory');
+                
+                if (!investments || investments.length === 0) {
+                    historyTable.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                No investment history found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                investments.forEach(investment => {
+                    const date = new Date(investment.createdAt || Date.now());
+                    const returnAmount = investment.financingAmount * (1 + (investment.interestRate || 0) / 100);
+                    
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 text-sm">${investment.invoiceId || 'N/A'}</td>
+                            <td class="px-6 py-4 text-sm font-medium">${investment.financingAmount ? investment.financingAmount.toFixed(2) : '0.00'} ETH</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${date.toLocaleDateString()}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs rounded ${investment.status === 'active' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">
+                                    ${investment.status || 'pending'}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium text-emerald-600">${returnAmount.toFixed(2)} ETH</td>
+                        </tr>
+                    `;
+                });
+                
+                historyTable.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading investment history:', error);
+            }
+        }
+        
+        // Load platform stats from backend
         async function loadPlatformStats() {
             try {
                 const response = await fetch(`${API_URL}/api/stats`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch stats');
+                }
+                
                 const stats = await response.json();
                 
-                document.getElementById('totalInvoices').textContent = stats.totalInvoices;
-                document.getElementById('totalFinanced').textContent = stats.totalFinanced;
-                document.getElementById('defaultRate').textContent = stats.defaultRate;
-                document.getElementById('activeInvestors').textContent = stats.activeInvestors;
+                // Update all stats displays
+                const elements = {
+                    'totalInvoices': stats.totalInvoices || '0',
+                    'totalFinanced': stats.totalFinanced || '0',
+                    'defaultRate': stats.defaultRate || '0%',
+                    'activeInvestors': stats.activeInvestors || '0',
+                    'statTotalInvoices': stats.totalInvoices || '0',
+                    'statFinanced': stats.totalFinanced || '0',
+                    'statDefaultRate': stats.defaultRate || '0%',
+                    'statActiveInvestors': stats.activeInvestors || '0',
+                    'totalVolume': stats.totalVolume || '0 ETH',
+                    'avgInvoiceSize': stats.avgInvoiceSize || '0 ETH',
+                    'avgInterestRate': stats.avgInterestRate || '0%',
+                    'successRate': stats.successRate || '0%'
+                };
+                
+                // Update each element
+                for (const [id, value] of Object.entries(elements)) {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = value;
+                    }
+                }
+                
+                // Update progress bars
+                const volumeProgress = Math.min(100, (parseFloat(stats.totalVolume || 0) / 1000) * 100);
+                const volumeProgressBar = document.getElementById('volumeProgress');
+                if (volumeProgressBar) volumeProgressBar.style.width = volumeProgress + '%';
+                
+                const avgSizeProgress = Math.min(100, (parseFloat(stats.avgInvoiceSize || 0) / 10) * 100);
+                const avgSizeProgressBar = document.getElementById('avgSizeProgress');
+                if (avgSizeProgressBar) avgSizeProgressBar.style.width = avgSizeProgress + '%';
+                
+                // Load recent transactions
+                await loadRecentTransactions();
+                
             } catch (error) {
-                console.log('Could not load platform stats:', error);
+                console.error('Error loading platform stats:', error);
+                
+                // Set default values
+                const defaultStats = {
+                    'totalInvoices': '0',
+                    'totalFinanced': '0',
+                    'defaultRate': '0%',
+                    'activeInvestors': '0'
+                };
+                
+                for (const [id, value] of Object.entries(defaultStats)) {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = value;
+                }
             }
         }
         
-        async function loadMarketplace() {
-            const contentDiv = document.getElementById('marketplaceContent');
+        // Load recent transactions from backend
+        async function loadRecentTransactions() {
+            const transactionsTable = document.getElementById('recentTransactions');
+            if (!transactionsTable) return;
             
-            // Sample data - replace with actual contract calls
-            const sampleInvoices = [
-                {
-                    id: 1001,
-                    amount: 5.5,
-                    dueDate: '2024-12-31',
-                    msme: '0x1234...5678',
-                    riskScore: 3,
-                    status: 'available'
-                },
-                {
-                    id: 1002,
-                    amount: 12.8,
-                    dueDate: '2024-11-30',
-                    msme: '0x8765...4321',
-                    riskScore: 6,
-                    status: 'available'
-                },
-                {
-                    id: 1003,
-                    amount: 8.2,
-                    dueDate: '2024-10-15',
-                    msme: '0xabcd...efgh',
-                    riskScore: 2,
-                    status: 'funded'
+            try {
+                const response = await fetch(`${API_URL}/api/transactions`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch transactions');
                 }
-            ];
-            
-            contentDiv.innerHTML = sampleInvoices.map(invoice => `
-                <div class="invoice-card ${invoice.status} bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h4 class="font-bold text-gray-900">Invoice #${invoice.id}</h4>
-                            <div class="mt-2 space-y-1">
-                                <div class="flex items-center text-sm">
-                                    <i data-lucide="dollar-sign" class="w-4 h-4 text-gray-400 mr-2"></i>
-                                    <span class="text-gray-900 font-medium">${invoice.amount} ETH</span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <i data-lucide="calendar" class="w-4 h-4 text-gray-400 mr-2"></i>
-                                    <span class="text-gray-600">Due: ${invoice.dueDate}</span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <i data-lucide="user" class="w-4 h-4 text-gray-400 mr-2"></i>
-                                    <span class="text-gray-600">MSME: ${invoice.msme}</span>
-                                </div>
-                                <div class="flex items-center text-sm">
-                                    <i data-lucide="shield" class="w-4 h-4 text-gray-400 mr-2"></i>
-                                    <span class="text-gray-600">Risk: ${invoice.riskScore}/10</span>
-                                </div>
-                            </div>
-                        </div>
-                        <span class="px-3 py-1 text-xs rounded-full ${invoice.status === 'available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-                            ${invoice.status === 'available' ? 'Available' : 'Funded'}
-                        </span>
-                    </div>
-                    ${invoice.status === 'available' ? `
-                        <button onclick="openInvestModal(${invoice.id}, '${invoice.amount}', '${invoice.msme}')" 
-                                class="btn-primary text-white w-full py-2 rounded-lg text-sm font-medium">
-                            <i data-lucide="trending-up" class="w-4 h-4 inline mr-2"></i>
-                            Invest Now
-                        </button>
-                    ` : `
-                        <button disabled class="bg-gray-100 text-gray-400 w-full py-2 rounded-lg text-sm font-medium">
-                            <i data-lucide="lock" class="w-4 h-4 inline mr-2"></i>
-                            Already Funded
-                        </button>
-                    `}
-                </div>
-            `).join('');
+                
+                const transactions = await response.json();
+                
+                let html = '';
+                transactions.forEach(tx => {
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 text-sm">${tx.time}</td>
+                            <td class="px-6 py-4 text-sm">${tx.type}</td>
+                            <td class="px-6 py-4 text-sm font-medium">${tx.amount}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs rounded ${tx.status === 'settled' ? 'bg-emerald-100 text-emerald-700' : tx.status === 'funded' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}">
+                                    ${tx.status}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                transactionsTable.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading recent transactions:', error);
+                transactionsTable.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                            Error loading transactions
+                        </td>
+                    </tr>
+                `;
+            }
         }
         
-        async function loadPortfolio() {
-            if (!currentAccount) return;
+        // Create invoice (backend API)
+        async function createInvoiceNFT(event) {
+            event.preventDefault();
             
-            // Sample data - replace with actual contract calls
-            const myInvoices = [
-                { id: 1004, amount: 7.5, dueDate: '2024-11-15', status: 'pending' }
-            ];
+            if (!currentAccount) {
+                showNotification('Please connect your wallet first', 'error');
+                return;
+            }
             
-            const myInvestments = [
-                { id: 1003, amount: 8.2, status: 'active', return: '12.5%' }
-            ];
+            const buyerAddress = document.getElementById('buyerAddress').value;
+            const invoiceAmount = document.getElementById('invoiceAmount').value;
+            const dueDate = document.getElementById('dueDate').value;
+            const invoiceNumber = document.getElementById('invoiceNumber').value;
+            const description = document.getElementById('description').value;
+            const documentHash = document.getElementById('documentHash').value;
+            const riskScore = document.getElementById('riskScore').value;
             
-            document.getElementById('myInvoices').innerHTML = myInvoices.map(invoice => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                        <div class="font-medium text-gray-900">Invoice #${invoice.id}</div>
-                        <div class="text-sm text-gray-500">${invoice.amount} ETH • Due ${invoice.dueDate}</div>
-                    </div>
-                    <span class="px-2 py-1 text-xs rounded ${invoice.status === 'pending' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
-                        ${invoice.status}
-                    </span>
-                </div>
-            `).join('');
+            // Validation
+            if (!buyerAddress || !buyerAddress.startsWith('0x')) {
+                showNotification('Please enter a valid buyer address', 'error');
+                return;
+            }
             
-            document.getElementById('myInvestments').innerHTML = myInvestments.map(investment => `
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                        <div class="font-medium text-gray-900">Invoice #${investment.id}</div>
-                        <div class="text-sm text-gray-500">${investment.amount} ETH • ${investment.return} return</div>
-                    </div>
-                    <span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">
-                        ${investment.status}
-                    </span>
-                </div>
-            `).join('');
+            if (!invoiceAmount || invoiceAmount <= 0) {
+                showNotification('Please enter a valid invoice amount', 'error');
+                return;
+            }
+            
+            const createBtn = document.getElementById('createInvoiceBtn');
+            const originalText = createBtn.innerHTML;
+            
+            try {
+                // Disable button and show loading
+                createBtn.disabled = true;
+                createBtn.innerHTML = '<div class="loading-spinner-small"></div> Creating...';
+                
+                // Send to backend API
+                const response = await fetch(`${API_URL}/api/invoices`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        buyerAddress,
+                        amount: parseFloat(invoiceAmount),
+                        dueDate,
+                        invoiceNumber,
+                        description,
+                        documentHash,
+                        riskScore: parseInt(riskScore),
+                        msmeAddress: currentAccount
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showNotification('Invoice created successfully!', 'success');
+                    
+                    // Reset form
+                    document.getElementById('createInvoiceForm').reset();
+                    
+                    // Update marketplace
+                    loadMarketplace();
+                    loadPortfolio();
+                    
+                    // Show portfolio page
+                    showPage('portfolio');
+                } else {
+                    throw new Error(result.error || 'Failed to create invoice');
+                }
+                
+            } catch (error) {
+                console.error('Error creating invoice:', error);
+                showNotification('Error creating invoice: ' + error.message, 'error');
+            } finally {
+                // Reset button
+                createBtn.disabled = false;
+                createBtn.innerHTML = originalText;
+            }
         }
         
-        function openInvestModal(tokenId, amount, msmeAddress) {
-            document.getElementById('modalInvoiceId').textContent = tokenId;
-            document.getElementById('modalInvoiceAmount').textContent = amount;
-            document.getElementById('modalInvoiceMSME').textContent = msmeAddress;
-            document.getElementById('investModal').classList.remove('hidden');
+        // Invest modal functions - FIXED VERSION
+        function openInvestModal(invoiceId, tokenId, amount, msmeAddress, dueDate) {
+            console.log('Opening invest modal with:', { invoiceId, tokenId, amount, msmeAddress, dueDate });
+            
+            // Store the invoice data globally
+            currentInvoiceData = {
+                invoiceId: invoiceId,
+                tokenId: tokenId,
+                amount: amount,
+                msmeAddress: msmeAddress,
+                dueDate: dueDate
+            };
+            
+            const modal = document.getElementById('investModal');
+            const invoiceIdElement = document.getElementById('modalInvoiceId');
+            const amountElement = document.getElementById('modalInvoiceAmount');
+            const msmeElement = document.getElementById('modalInvoiceMSME');
+            const dueDateElement = document.getElementById('modalInvoiceDueDate');
+            
+            if (invoiceIdElement) invoiceIdElement.textContent = invoiceId;
+            if (amountElement) amountElement.textContent = amount;
+            if (msmeElement) msmeElement.textContent = msmeAddress?.substring(0, 8) + '...';
+            if (dueDateElement) dueDateElement.textContent = dueDate;
+            if (modal) modal.classList.remove('hidden');
+            
+            // Pre-fill financing amount (80% of invoice amount by default)
+            const financingAmount = parseFloat(amount) * 0.8;
+            const financingInput = document.getElementById('financingAmount');
+            if (financingInput) financingInput.value = financingAmount.toFixed(2);
         }
         
         function closeInvestModal() {
-            document.getElementById('investModal').classList.add('hidden');
+            const modal = document.getElementById('investModal');
+            if (modal) modal.classList.add('hidden');
+            
+            const form = document.getElementById('investForm');
+            if (form) form.reset();
+            
+            // Clear current invoice data
+            currentInvoiceData = {};
         }
         
-        // Quick Create Form Submission
-        document.getElementById('quickCreateForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!currentAccount) {
-                alert('Please connect your wallet first!');
-                return;
-            }
-            alert('Invoice created successfully! (Demo mode)');
-        });
-        
-        // Event Listeners
-        document.getElementById('connectWallet').addEventListener('click', connectWallet);
-        
-        document.getElementById('investForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Investment submitted! (Smart contract integration needed)');
-            closeInvestModal();
-        });
+        // Show notification
+        function showNotification(message, type = 'info') {
+            // Remove existing notifications
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg ${
+                type === 'success' ? 'bg-emerald-500 text-white' :
+                type === 'error' ? 'bg-red-500 text-white' :
+                type === 'warning' ? 'bg-amber-500 text-white' :
+                'bg-blue-500 text-white'
+            }`;
+            
+            // Use message-circle instead of discord icon
+            const iconName = type === 'success' ? 'check-circle' : 
+                           type === 'error' ? 'alert-circle' : 
+                           type === 'warning' ? 'alert-triangle' : 'info';
+            
+            notification.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            class="ml-4 text-white hover:text-gray-200">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            lucide.createIcons();
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
         
         // Listen for account changes
         if (window.ethereum) {
             window.ethereum.on('accountsChanged', (accounts) => {
                 if (accounts.length === 0) {
+                    // User disconnected wallet
                     currentAccount = null;
-                    updateUI();
+                    const walletInfo = document.getElementById('walletInfo');
+                    const connectBtn = document.getElementById('connectWallet');
+                    const connectText = document.getElementById('connectWalletText');
+                    
+                    if (walletInfo) walletInfo.classList.add('hidden');
+                    if (connectText) connectText.textContent = 'Connect Wallet';
+                    if (connectBtn) {
+                        connectBtn.innerHTML = '<i data-lucide="wallet" class="w-4 h-4"></i> Connect Wallet';
+                        connectBtn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+                        connectBtn.classList.add('bg-gray-900', 'hover:bg-gray-800');
+                    }
+                    
+                    showNotification('Wallet disconnected', 'warning');
                 } else {
                     currentAccount = accounts[0];
-                    updateUI();
-                    loadData();
+                    updateWalletUI(currentAccount);
+                    showNotification('Wallet account changed', 'info');
+                }
+            });
+            
+            window.ethereum.on('chainChanged', () => {
+                location.reload();
+            });
+        }
+        
+        // Event listeners
+        const createInvoiceForm = document.getElementById('createInvoiceForm');
+        if (createInvoiceForm) {
+            createInvoiceForm.addEventListener('submit', createInvoiceNFT);
+        }
+        
+        const investForm = document.getElementById('investForm');
+        if (investForm) {
+            investForm.addEventListener('submit', submitInvestment);
+        }
+        
+        // Close modal when clicking outside
+        const investModal = document.getElementById('investModal');
+        if (investModal) {
+            investModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeInvestModal();
                 }
             });
         }
         
-        // Close modal when clicking outside
-        document.getElementById('investModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeInvestModal();
-            }
+        // Initialize on load
+        window.addEventListener('load', () => {
+            console.log('Page loaded, initializing...');
+            initApp();
+            showPage('home');
         });
     </script>
 </body>
